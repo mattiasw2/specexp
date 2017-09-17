@@ -4,6 +4,7 @@
    [clojure.spec.alpha :as s]
    [taoensso.truss :as truss :refer (have have! have?)]
    [taoensso.timbre :as timbre]
+   [clojure.core.match :refer [match]]
    [clojure.pprint :as pp]
    [clojure.tools.logging :as log]))
 
@@ -57,14 +58,21 @@
 
 ;; (alter-var-root #'pp/*print-suppress-namespaces* (constantly true))
 
+;; (t (throw (Exception. "foo")))
+;; generates
+;; (deftest throw-test (is (thrown? java.lang.Exception (throw (Exception. "foo")))))
 (defn- t-3
+  "Either generate plain test-case, or if Exception is thrown, assume that is expected."
   [frms]
   ;; for (binding we should have the value, not a function
   (binding [pp/*print-suppress-namespaces* true]
     (pp/pprint
-     `(deftest ~(symbol (str (first frms) "-test"))
-        (is (= '~(eval frms)
-               ~frms))))))
+     (let [res (try {:ok (eval frms)} (catch Throwable e {:exception (type e)}))]
+       (match res
+         {:ok val} `(deftest ~(symbol (str (first frms) "-test"))
+                      (is (= '~val ~frms)))
+         {:exception exc} `(deftest ~(symbol (str (first frms) "-test"))
+                             (is (thrown? ~exc ~frms))))))))
 
 (defmacro t
   "Create a test case by executing `frms`."
