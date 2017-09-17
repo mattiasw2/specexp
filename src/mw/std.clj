@@ -67,12 +67,15 @@
   ;; for (binding we should have the value, not a function
   (binding [pp/*print-suppress-namespaces* true]
     (pp/pprint
-     (let [res (try {:ok (eval frms)} (catch Throwable e {:exception (type e)}))]
+     (let [res (try {:ok (eval frms)} (catch Throwable e {:exception [(type e) (ex-data e)]}))]
        (match res
          {:ok val} `(deftest ~(symbol (str (first frms) "-test"))
                       (is (= '~val ~frms)))
-         {:exception exc} `(deftest ~(symbol (str (first frms) "-test"))
-                             (is (thrown? ~exc ~frms))))))))
+         {:exception [exc nil]} `(deftest ~(symbol (str (first frms) "-test"))
+                                   (is (thrown? ~exc ~frms)))
+         {:exception [exc exinfo]} `(deftest ~(symbol (str (first frms) "-test"))
+                                      (comment ~(str exinfo))
+                                      (is (thrown? ~exc ~frms))))))))
 
 (defmacro t
   "Create a test case by executing `frms`."
